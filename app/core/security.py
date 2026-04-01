@@ -83,6 +83,7 @@ def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]) -> dict:
 
 
 def require_admin(current_user: Annotated[dict, Depends(get_current_user)]) -> dict:
+    """判断当前用户是不是管理员"""
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin privileges required")
     return current_user
