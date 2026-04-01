@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+python-multipart
+python-jose[cryptography]
+passlib[bcrypt]
+pydantic
+pydantic-settings
+langchain
+langchain-community
+langchain-openai
+faiss-cpu
+sentence-transformers
+openpyxl
+pandas
+httpx
+python-dotenv
