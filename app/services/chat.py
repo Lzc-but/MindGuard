@@ -35,7 +35,7 @@ def chat_with_context(
     messages = [
         SystemMessage(content=system_prompt),
         SystemMessage(content=f"Knowledge base context:\n{context}"),
-        *SESSION_MESSAGES[session_id][-8:],
+        *SESSION_MESSAGES[session_id][-8:], # 把当前用户最近 8 轮聊天历史，放进 AI 上下文里
         HumanMessage(content=question),
     ]
 

@@ -11,7 +11,7 @@ from app.core.config import settings
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
-
+# 定义两个固定用户
 FAKE_USERS = {
     settings.admin_username: {
         "username": settings.admin_username,
@@ -31,6 +31,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 def authenticate_user(username: str, password: str) -> dict | None:
+    """登录校验函数"""
     user = FAKE_USERS.get(username)
     if not user:
         return None
@@ -49,22 +50,35 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
 
 
 def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]) -> dict:
+    """获取当前登录用户的信息"""
+    # 定义通用登录失败异常
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
+        # 1.用密钥解密Token,拿到里面存储的：用户名(sub)、角色(role)
         payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+
+        # 2. 从解密后的内容里取出用户名和角色
         username: str | None = payload.get("sub")
         role: str | None = payload.get("role")
+
+        # 3. 如果缺少用户名或角色 → 判定无效
         if username is None or role is None:
             raise credentials_exception
+        
+    # 4. 如果 Token 过期、伪造、格式错误 → 全部判定无效
     except JWTError as exc:
         raise credentials_exception from exc
+    
+    # 5. 检查用户是否真实存在（这里是模拟用户库）
     user = FAKE_USERS.get(username)
     if user is None:
         raise credentials_exception
+    
+    # 6. 全部验证通过 → 返回用户信息（用户名+角色）
     return {"username": username, "role": role}
 
 
