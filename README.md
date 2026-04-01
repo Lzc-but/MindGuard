@@ -70,3 +70,50 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
    - `status`: `high_risk | medium_risk | low_risk`
    - `score`: `0-1` 概率
    - `suggestion`: 干预建议
+
+## 项目目录
+mental_guard_ai/
+├── app/
+│   ├── __init__.py
+│   ├── main.py                 # FastAPI 主入口
+│   ├── api/
+│   │   ├── __init__.py
+│   │   ├── auth.py             # 登录、JWT、权限
+│   │   ├── chat.py             # 对话接口
+│   │   ├── knowledge.py        # 知识库上传/管理
+│   │   └── mental.py           # 心理状态识别
+│   ├── core/
+│   │   ├── __init__.py
+│   │   ├── config.py           # 全局配置
+│   │   ├── security.py         # JWT + OAuth2 鉴权
+│   │   └── exceptions.py       # 统一异常处理
+│   ├── models/
+│   │   ├── __init__.py
+│   │   └── llm.py              # 加载微调后模型 + Ollama/OpenAI
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── rag.py              # FAISS 向量检索
+│   │   ├── chat.py             # 对话 + 上下文管理
+│   │   ├── knowledge.py        # 知识库向量化
+│   │   ├── mental.py           # 心理状态识别
+│   │   ├── mcp.py              # MCP 外部服务
+│   │   └── excel.py            # Excel 导出
+│   ├── schemas/                # Pydantic 数据模型
+│   │   ├── __init__.py
+│   │   ├── user.py
+│   │   ├── chat.py
+│   │   └── mental.py
+│   └── utils/
+│       ├── __init__.py
+│       ├── vector.py
+│       └── file.py
+├── data/
+│   ├── knowledge/              # 管理员上传知识库
+│   ├── vector_store/           # FAISS 索引
+│   ├── exports/                # Excel 输出
+│   └── logs/
+├── models/
+│   └── finetuned/              # 已微调好的 LoRA 模型（直接放这里）
+├── .env
+├── requirements.txt
+└── README.md
