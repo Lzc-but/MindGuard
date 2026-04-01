@@ -1,0 +1,11 @@
+.env
+env
+.vscode
+
+config.py
+
+/data
+/models
+
+**/__pycache__/
+*.pyc
