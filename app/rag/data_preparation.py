@@ -8,10 +8,13 @@ from pathlib import Path
 from typing import List, Dict, Any
 
 from langchain_text_splitters import MarkdownHeaderTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
+from langchain_community.document_loaders import TextLoader
 from pathlib import Path
 import uuid
 
+from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 class DataPreparationModule:
@@ -54,39 +57,48 @@ class DataPreparationModule:
         
         # 直接读取Markdown文件以保持原始格式
         documents = []
-        data_path_obj = Path(self.data_path)
-
-        for md_file in data_path_obj.rglob("*.md"):
+        path_obj = Path(self.data_path).resolve()
+        file_list: List[Path] = []
+        if path_obj.is_file():
+                file_list.append(path_obj)
+        else:
+            file_list.extend(path_obj.rglob())
+        for md_file in file_list:
             try:
+                loader = TextLoader(str(md_file), encoding="utf-8")
+                docs = loader.load()[0]
+                
                 # 直接读取文件内容，保持Markdown格式
-                with open(md_file, 'r', encoding='utf-8') as f:
-                    content = f.read()
+                # with open(md_file, 'r', encoding='utf-8') as f:
+                #     content = f.read()
 
                 # 为每个父文档分配确定性的唯一ID（基于数据根目录的相对路径）
                 try:
-                    data_root = Path(self.data_path).resolve()
+                    data_root = Path(settings.knowledge_path).resolve()
                     relative_path = Path(md_file).resolve().relative_to(data_root).as_posix()
                 except Exception:
                     relative_path = Path(md_file).as_posix()
                 parent_id = hashlib.md5(relative_path.encode("utf-8")).hexdigest()
 
+                docs.metadata["parent_id"] = parent_id
+                docs.metadata["doc_type"] = "parent"
                 # 创建Document对象
-                doc = Document(
-                    page_content=content,
-                    metadata={
-                        "source": str(md_file),
-                        "parent_id": parent_id,
-                        "doc_type": "parent"  # 标记为父文档
-                    }
-                )
-                documents.append(doc)
+                # doc = Document(
+                #     page_content=content,
+                #     metadata={
+                #         "source": str(md_file),
+                #         "parent_id": parent_id,
+                #         "doc_type": "parent"  # 标记为父文档
+                #     }
+                # )
+                documents.append(docs)
 
             except Exception as e:
                 logger.warning(f"读取文件 {md_file} 失败: {e}")
         
         # 增强文档元数据
-        for doc in documents:
-            self._enhance_metadata(doc)
+        # for doc in documents:
+        #     self._enhance_metadata(doc)
         
         self.documents = documents
         logger.info(f"成功加载 {len(documents)} 个文档")
@@ -148,10 +160,24 @@ class DataPreparationModule:
 
         if not self.documents:
             raise ValueError("请先加载文档")
+        markdown_docs = []
+        other_docs = []
+        chunks = []
+        for doc in self.documents:
+            file_path = Path(doc.metadata["source"])
+            if file_path.suffix.lower() == ".md":
+                markdown_docs.append(doc)
+            else:
+                other_docs.append(doc)
+        if markdown_docs:
+            # 使用Markdown标题分割器
+            chunks_md = self._markdown_header_split(markdown_docs)
 
-        # 使用Markdown标题分割器
-        chunks = self._markdown_header_split()
-
+        splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=80)
+        chunks_txt = splitter.split_documents(other_docs)
+        
+        chunks.extend(chunks_md)
+        chunks.extend(chunks_txt)
         # 为每个chunk添加基础元数据
         for i, chunk in enumerate(chunks):
             if 'chunk_id' not in chunk.metadata:
@@ -164,7 +190,7 @@ class DataPreparationModule:
         logger.info(f"Markdown分块完成，共生成 {len(chunks)} 个chunk")
         return chunks
 
-    def _markdown_header_split(self) -> List[Document]:
+    def _markdown_header_split(self, docs: List[Document]) -> List[Document]:
         """
         使用Markdown标题分割器进行结构化分割
 
@@ -186,7 +212,7 @@ class DataPreparationModule:
 
         all_chunks = []
 
-        for doc in self.documents:
+        for doc in docs:
             try:
                 # 检查文档内容是否包含Markdown标题
                 content_preview = doc.page_content[:200]

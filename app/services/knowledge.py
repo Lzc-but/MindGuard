@@ -6,7 +6,7 @@ from langchain_community.vectorstores import FAISS
 from app.core.config import settings
 from app.utils.vector import get_embeddings
 from app.services.rag import load_vector_store
-
+from app.rag.data_preparation import DataPreparationModule
 
 def build_knowledge_index() -> int:
     """重新构建知识库索引"""
@@ -50,20 +50,21 @@ def build_knowledge_by_file(file_path: str) -> int:
     # 安全校验：必须在知识库目录内
     if settings.knowledge_path not in str(file_path.parent.resolve()):
         raise ValueError("Invalid file path")
-
+    data_module = DataPreparationModule(file_path)
     # 读取文件
     try:
-        loader = TextLoader(str(file_path), encoding="utf-8")
-        docs = loader.load()
+        data_module.load_documents()
+        # loader = TextLoader(str(file_path), encoding="utf-8")
+        # docs = loader.load()
     except Exception as e:
         raise ValueError(f"Failed to read file: {str(e)}") from e
 
-    if not docs:
-        return 0
+    # if not docs:
+    #     return 0
 
     # 切分文本
-    splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=80)
-    chunks = splitter.split_documents(docs)
+    chunks = data_module.chunk_documents()
+
 
     # 加载现有向量库 → 增量添加
     vector_store = load_vector_store()
