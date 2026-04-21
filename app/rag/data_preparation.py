@@ -67,10 +67,6 @@ class DataPreparationModule:
             try:
                 loader = TextLoader(str(md_file), encoding="utf-8")
                 docs = loader.load()[0]
-                
-                # 直接读取文件内容，保持Markdown格式
-                # with open(md_file, 'r', encoding='utf-8') as f:
-                #     content = f.read()
 
                 # 为每个父文档分配确定性的唯一ID（基于数据根目录的相对路径）
                 try:
@@ -82,23 +78,10 @@ class DataPreparationModule:
 
                 docs.metadata["parent_id"] = parent_id
                 docs.metadata["doc_type"] = "parent"
-                # 创建Document对象
-                # doc = Document(
-                #     page_content=content,
-                #     metadata={
-                #         "source": str(md_file),
-                #         "parent_id": parent_id,
-                #         "doc_type": "parent"  # 标记为父文档
-                #     }
-                # )
                 documents.append(docs)
 
             except Exception as e:
                 logger.warning(f"读取文件 {md_file} 失败: {e}")
-        
-        # 增强文档元数据
-        # for doc in documents:
-        #     self._enhance_metadata(doc)
         
         self.documents = documents
         logger.info(f"成功加载 {len(documents)} 个文档")
@@ -169,15 +152,16 @@ class DataPreparationModule:
                 markdown_docs.append(doc)
             else:
                 other_docs.append(doc)
+                
         if markdown_docs:
             # 使用Markdown标题分割器
             chunks_md = self._markdown_header_split(markdown_docs)
+            chunks.extend(chunks_md)
 
-        splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=80)
-        chunks_txt = splitter.split_documents(other_docs)
-        
-        chunks.extend(chunks_md)
-        chunks.extend(chunks_txt)
+        if other_docs:
+            splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=80)
+            chunks_txt = splitter.split_documents(other_docs)
+            chunks.extend(chunks_txt)
         # 为每个chunk添加基础元数据
         for i, chunk in enumerate(chunks):
             if 'chunk_id' not in chunk.metadata:
