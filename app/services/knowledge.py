@@ -1,73 +1,63 @@
 from pathlib import Path
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import TextLoader
-from langchain_community.vectorstores import FAISS
 
 from app.core.config import settings
-from app.utils.vector import get_embeddings
-from app.services.retrieval import load_vector_store
+from app.services.retrieval import invalidate_cache
+from app.rag.index_construction import IndexConstructionModule
 from app.rag.data_preparation import DataPreparationModule
 
+
+def _create_index_module() -> IndexConstructionModule:
+    return IndexConstructionModule(
+        model_key=settings.dashscope_api_key,
+        model_name=settings.embedding_model,
+        index_save_path=settings.vector_store_path,
+    )
+
+
 def build_knowledge_index() -> int:
-    """重新构建知识库索引"""
-
-    # 1. 获取知识库文件夹路径
+    """全量重建知识库索引（使用 IndexConstructionModule 分批处理 DashScope 限制）"""
     knowledge_dir = Path(settings.knowledge_path)
-
-    # 2. 找出文件夹里所有 .txt 和 .md 文件
     files = list(knowledge_dir.glob("*.txt")) + list(knowledge_dir.glob("*.md"))
     if not files:
         raise ValueError("No text/markdown files found in knowledge directory")
 
     docs = []
-    # 3. 循环读取每一个文件内容
     for file_path in files:
         loader = TextLoader(str(file_path), encoding="utf-8")
         docs.extend(loader.load())
 
-    # 4. 文本切割器（把长文章切成小块）
-    # chunk_size=500：每块 500 字符
-    # chunk_overlap=80：块之间重叠 80 字符（保证语义不切断）
     splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=80)
-
-    # 5. 执行切割 → 得到很多小片段（chunks）
     chunks = splitter.split_documents(docs)
 
-    # 6. 把所有小片段 → 生成向量 → 创建 FAISS 向量库
-    vector_store = FAISS.from_documents(chunks, get_embeddings())
-
-    # 7. 把向量库保存到本地（data/vector_store）
-    vector_store.save_local(settings.vector_store_path)
-
-    # 8. 返回一共切了多少块（给前端显示）
+    index_module = _create_index_module()
+    index_module.build_vector_index(chunks)
+    index_module.save_index()
+    invalidate_cache()
     return len(chunks)
 
-def build_knowledge_by_file(file_path: str) -> int:
-    """新增知识库索引"""
 
-    # 安全校验：必须在知识库目录内
+def build_knowledge_by_file(file_path: str) -> int:
+    """增量构建知识库索引（Markdown 结构感知分块 + batch 向量化）"""
     if settings.knowledge_path not in str(file_path.parent.resolve()):
         raise ValueError("Invalid file path")
     data_module = DataPreparationModule(file_path)
-    # 读取文件
     try:
         data_module.load_documents()
     except Exception as e:
         raise ValueError(f"Failed to read file: {str(e)}") from e
 
-    # 切分文本
     chunks = data_module.chunk_documents()
 
-    # 加载现有向量库 → 增量添加
-    vector_store = load_vector_store()
+    index_module = _create_index_module()
+    vector_store = index_module.load_index()
 
     if vector_store is None:
-        # 第一次创建
-        vector_store = FAISS.from_documents(chunks, get_embeddings())
+        index_module.build_vector_index(chunks)
     else:
-        # 追加进去（不覆盖、不重建）
-        vector_store.add_documents(chunks)
+        index_module.add_documents(chunks)
 
-    # 保存
-    vector_store.save_local(settings.vector_store_path)
+    index_module.save_index()
+    invalidate_cache()
     return len(chunks)
