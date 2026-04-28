@@ -45,8 +45,6 @@ def build_knowledge_index() -> int:
 def build_knowledge_by_file(file_path: str) -> int:
     """新增知识库索引"""
 
-    file_path = Path(file_path)
-
     # 安全校验：必须在知识库目录内
     if settings.knowledge_path not in str(file_path.parent.resolve()):
         raise ValueError("Invalid file path")
@@ -54,17 +52,11 @@ def build_knowledge_by_file(file_path: str) -> int:
     # 读取文件
     try:
         data_module.load_documents()
-        # loader = TextLoader(str(file_path), encoding="utf-8")
-        # docs = loader.load()
     except Exception as e:
         raise ValueError(f"Failed to read file: {str(e)}") from e
 
-    # if not docs:
-    #     return 0
-
     # 切分文本
     chunks = data_module.chunk_documents()
-
 
     # 加载现有向量库 → 增量添加
     vector_store = load_vector_store()

@@ -6,6 +6,7 @@ from app.api.knowledge import router as knowledge_router
 from app.api.mental import router as mental_router
 from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
+from app.services.conversation import init_chat_db
 from app.utils.file import ensure_data_dirs
 import fastapi_cdn_host
 
@@ -18,6 +19,7 @@ def create_app() -> FastAPI:
 
     # 自动创建项目需要的文件夹
     ensure_data_dirs()
+    init_chat_db()
 
     # 注册全局异常处理
     register_exception_handlers(app)

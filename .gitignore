@@ -1,11 +1,58 @@
+# 环境变量
 .env
-env
-.vscode
+*.local
 
-config.py
+# Python 虚拟环境
+.venv/
+venv/
+env/
+.conda/
 
-/data
-/models
+# IDE / 编辑器
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 
-**/__pycache__/
-*.pyc
+# Python 编译产物
+__pycache__/
+*.py[cod]
+
+# 缺失的配置文件
+app/core/config.py
+
+# 分发 / 打包
+dist/
+dist-ssr/
+build/
+*.egg-info/
+*.egg
+
+# 测试与覆盖率
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# 前端依赖与日志
+node_modules/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Vite / TypeScript
+.vite/
+*.tsbuildinfo
+*.timestamp-*
+
+# 运行时数据（由程序自动生成）
+/data/
+/models/
