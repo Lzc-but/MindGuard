@@ -3,7 +3,7 @@ from collections import defaultdict
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from app.models.llm import get_chat_model
-from app.services.rag import similarity_search
+from app.services.retrieval import similarity_search
 
 # ====================== 全局变量：会话记忆 ======================
 # 结构：{ "会话ID": [对话历史列表] }

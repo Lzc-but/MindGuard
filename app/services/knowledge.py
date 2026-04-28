@@ -5,7 +5,7 @@ from langchain_community.vectorstores import FAISS
 
 from app.core.config import settings
 from app.utils.vector import get_embeddings
-from app.services.rag import load_vector_store
+from app.services.retrieval import load_vector_store
 from app.rag.data_preparation import DataPreparationModule
 
 def build_knowledge_index() -> int:

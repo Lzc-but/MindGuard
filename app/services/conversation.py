@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from app.core.config import settings
 from app.models.llm import get_chat_model
-from app.services.rag import similarity_search
+from app.services.retrieval import similarity_search
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 
