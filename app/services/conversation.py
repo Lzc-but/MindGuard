@@ -1,14 +1,10 @@
-import logging
 import sqlite3
 import uuid
 from datetime import datetime, timezone
 
 from app.core.config import settings
-from app.models.llm import get_chat_model
-from app.services.retrieval import similarity_search
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-
-logger = logging.getLogger(__name__)
+from app.graphs.chat_graph import chat_graph
+from langchain_core.messages import AIMessage, HumanMessage
 
 
 def _utc_now() -> str:
@@ -298,32 +294,13 @@ def chat_in_conversation(user_id: str, conversation_id: str, question: str) -> t
     try:
         _ensure_conversation_exists(conn, user_id, conversation_id)
 
-        references = similarity_search(question, k=3)
-        context = "\n\n".join(references) if references else "No external context found."
-
-        model = get_chat_model()
-        system_prompt = (
-            "你是一个心理健康助手，回答要安全、有同理心。"
-            "如果用户有自残/自杀风险，必须建议立即联系紧急援助。"
-        )
         history_messages = _build_history_messages(conn, conversation_id)
-        messages = [
-            SystemMessage(content=system_prompt),
-            SystemMessage(content=f"Knowledge base context:\n{context}"),
-            *history_messages,
-            HumanMessage(content=question),
-        ]
-
-        try:
-            response = model.invoke(messages)
-            answer = str(response.content)
-        except Exception:
-            logger.exception("LLM invoke failed for conversation %s", conversation_id)
-            answer = (
-                "非常抱歉，我暂时无法处理您的请求。请稍后再试。"
-                "如果您正处于紧急情况，请立即联系学校心理中心或拨打心理援助热线。"
-            )
-            references = []
+        result = chat_graph.invoke({
+            "question": question,
+            "history_messages": history_messages,
+        })
+        answer = result["answer"]
+        references = result.get("references", [])
 
         _insert_message(conn, conversation_id, "user", question)
         _insert_message(conn, conversation_id, "assistant", answer)
