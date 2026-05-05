@@ -12,6 +12,7 @@ const activeMenu = computed(() => route.path);
 
 const menuItems = [
   { index: "/admin/knowledge/manage", label: "知识库管理", icon: "📚" },
+  { index: "/admin/users", label: "用户管理", icon: "👥" },
 ];
 
 const handleSelect = (index: string) => {

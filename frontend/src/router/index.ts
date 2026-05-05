@@ -31,13 +31,17 @@ const routes: RouteRecordRaw[] = [
         path: "knowledge/manage",
         component: () => import("../views/knowledge/KnowledgeManageView.vue"),
       },
+      {
+        path: "users",
+        component: () => import("../views/admin/UserManageView.vue"),
+      },
     ],
   },
-  // 根路径按角色跳转
+  // 根路径按角色跳转——完全由 beforeEach 守卫处理，不设 redirect
   {
     path: "/",
-    redirect: "/user/chat",
-    meta: { public: true },
+    component: { template: "<div />" },
+    meta: { requiresAuth: true },
   },
   {
     path: "/:pathMatch(.*)*",
@@ -65,6 +69,11 @@ router.beforeEach(async (to) => {
       authStore.logout();
       return "/login";
     }
+  }
+
+  // 根路径按角色跳转
+  if (to.path === "/") {
+    return authStore.user?.role === "admin" ? "/admin" : "/user/chat";
   }
 
   // 路由声明了允许的角色列表时，检查当前用户角色
