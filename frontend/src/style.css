@@ -5,17 +5,31 @@
 body {
   margin: 0;
   min-width: 320px;
-  background: #f5f7fa;
-  color: #1f2329;
-  font-family: "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+  background: #f7f8fa;
+  color: #1d1d1f;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 #app {
   min-height: 100vh;
 }
 
-.page-title {
-  margin: 0 0 16px;
-  font-size: 22px;
-  font-weight: 600;
+/* 自定义细滚动条 */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 5px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #d1d1d6;
+  border-radius: 999px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #aeaeb2;
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { useAuthStore } from "../stores/auth";
@@ -10,17 +10,18 @@ const route = useRoute();
 const authStore = useAuthStore();
 const chatStore = useChatStore();
 
+const sidebarCollapsed = ref(false);
 const activeMenu = computed(() => route.path);
 const isChatRoute = computed(() => route.path.startsWith("/chat"));
 
 const menuItems = computed(() => {
   const items = [
-    { index: "/chat", label: "AI 聊天" },
-    { index: "/mental/analyze", label: "心理分析" },
-    { index: "/profile", label: "个人信息" },
+    { index: "/chat", label: "AI 聊天", icon: "💬" },
+    { index: "/mental/analyze", label: "心理分析", icon: "🧠" },
+    { index: "/profile", label: "个人信息", icon: "👤" },
   ];
   if (authStore.isAdmin) {
-    items.splice(2, 0, { index: "/knowledge/manage", label: "知识库管理" });
+    items.splice(2, 0, { index: "/knowledge/manage", label: "知识库管理", icon: "📚" });
   }
   return items;
 });
@@ -58,155 +59,130 @@ onMounted(async () => {
 </script>
 
 <template>
-  <el-container class="layout-root">
-    <el-aside width="220px" class="layout-aside">
-      <div class="layout-logo">心护AI</div>
+  <div class="flex h-screen bg-[#f7f8fa] text-[#1d1d1f]">
 
-      <div v-if="isChatRoute" class="chat-nav">
-        <button class="chat-nav-new" type="button" @click="goChatAndCreate">+ 新对话</button>
-        <el-scrollbar class="chat-nav-scroll" v-loading="chatStore.convoLoading">
+    <!-- ===== 可折叠侧边栏 ===== -->
+    <aside
+      class="flex flex-col bg-white border-r border-[#e5e7eb] transition-all duration-300 ease-in-out shrink-0"
+      :class="sidebarCollapsed ? 'w-[64px]' : 'w-[240px]'"
+    >
+      <!-- Logo & 折叠按钮 -->
+      <div class="flex items-center h-14 px-3 border-b border-[#f0f0f0] shrink-0"
+        :class="sidebarCollapsed ? 'justify-center' : 'justify-between'"
+      >
+        <span
+          v-show="!sidebarCollapsed"
+          class="text-lg font-bold text-[#4f6ef7] tracking-tight whitespace-nowrap"
+        >心护AI</span>
+        <button
+          class="flex items-center justify-center w-8 h-8 rounded-lg text-[#8e8e93] hover:bg-[#f5f5f7] hover:text-[#1d1d1f] transition-colors shrink-0"
+          @click="sidebarCollapsed = !sidebarCollapsed"
+          :title="sidebarCollapsed ? '展开侧栏' : '收起侧栏'"
+        >
+          <svg class="w-5 h-5 transition-transform duration-300" :class="sidebarCollapsed ? '' : 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- 会话列表区域（仅聊天页可见） -->
+      <div v-if="isChatRoute" class="flex flex-col flex-1 min-h-0 px-2 pt-3">
+        <!-- 新对话按钮 -->
+        <button
+          v-if="!sidebarCollapsed"
+          class="w-full mb-3 py-2.5 px-3 text-sm font-medium text-white bg-[#4f6ef7] hover:bg-[#3d5ce5] rounded-xl transition-colors shrink-0"
+          @click="goChatAndCreate"
+        >
+          + 新对话
+        </button>
+        <button
+          v-else
+          class="flex items-center justify-center w-10 h-10 mx-auto mb-3 rounded-xl text-white bg-[#4f6ef7] hover:bg-[#3d5ce5] transition-colors shrink-0"
+          @click="goChatAndCreate"
+          title="新对话"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+          </svg>
+        </button>
+
+        <!-- 会话列表 -->
+        <div v-show="!sidebarCollapsed" class="flex-1 min-h-0 overflow-y-auto space-y-1.5 pr-0.5 scrollbar-thin">
           <div
             v-for="item in chatStore.conversations"
             :key="item.id"
-            class="chat-nav-item"
-            :class="{ active: item.id === chatStore.currentConversationId }"
+            class="group flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer transition-colors"
+            :class="item.id === chatStore.currentConversationId
+              ? 'bg-[#eef1ff] text-[#4f6ef7]'
+              : 'hover:bg-[#f5f5f7] text-[#3a3a3c]'"
             @click="selectConversation(item.id)"
           >
-            <div class="chat-nav-title">{{ item.title }}</div>
-            <div class="chat-nav-actions">
-              <el-button type="primary" text size="small" @click.stop="chatStore.promptRenameConversation(item)">
-                重命名
-              </el-button>
-              <el-button type="danger" text size="small" @click.stop="chatStore.removeConversation(item.id)">
-                删除
-              </el-button>
+            <span class="text-sm truncate flex-1 min-w-0">{{ item.title }}</span>
+            <div class="hidden group-hover:flex items-center gap-0.5 ml-1 shrink-0">
+              <button
+                class="p-1 rounded-md text-[#8e8e93] hover:text-[#4f6ef7] hover:bg-white transition-colors"
+                title="重命名"
+                @click.stop="chatStore.promptRenameConversation(item)"
+              >
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+              </button>
+              <button
+                class="p-1 rounded-md text-[#8e8e93] hover:text-red-500 hover:bg-white transition-colors"
+                title="删除"
+                @click.stop="chatStore.removeConversation(item.id)"
+              >
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
             </div>
           </div>
-        </el-scrollbar>
-        <div class="chat-nav-divider" />
+        </div>
+
+        <div v-show="!sidebarCollapsed" class="h-px bg-[#f0f0f0] my-2 shrink-0" />
       </div>
 
-      <el-menu :default-active="activeMenu" class="layout-menu" @select="handleSelect">
-        <el-menu-item v-for="item in menuItems" :key="item.index" :index="item.index">
-          {{ item.label }}
-        </el-menu-item>
-      </el-menu>
-    </el-aside>
-    <el-container>
-      <el-header class="layout-header">
-        <div class="layout-user">当前用户：{{ authStore.user?.username }}（{{ authStore.user?.role }}）</div>
-        <el-button type="danger" plain @click="handleLogout">退出登录</el-button>
-      </el-header>
-      <el-main class="layout-main">
+      <!-- 菜单 -->
+      <nav class="flex flex-col gap-0.5 px-2 py-3 shrink-0">
+        <button
+          v-for="item in menuItems"
+          :key="item.index"
+          class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors"
+          :class="[
+            activeMenu === item.index
+              ? 'bg-[#eef1ff] text-[#4f6ef7] font-medium'
+              : 'text-[#3a3a3c] hover:bg-[#f5f5f7]',
+            sidebarCollapsed ? 'justify-center' : ''
+          ]"
+          @click="handleSelect(item.index)"
+          :title="sidebarCollapsed ? item.label : ''"
+        >
+          <span class="text-lg shrink-0">{{ item.icon }}</span>
+          <span v-show="!sidebarCollapsed" class="whitespace-nowrap">{{ item.label }}</span>
+        </button>
+      </nav>
+    </aside>
+
+    <!-- ===== 右侧主区域 ===== -->
+    <div class="flex flex-col flex-1 min-w-0">
+      <!-- 顶部栏 -->
+      <header class="flex items-center justify-between h-14 px-5 bg-white border-b border-[#e5e7eb] shrink-0">
+        <span class="text-sm text-[#6e6e73]">
+          当前用户：<span class="text-[#1d1d1f] font-medium">{{ authStore.user?.username }}</span>
+          <span class="text-[#aeaeb2]">（{{ authStore.user?.role }}）</span>
+        </span>
+        <button
+          class="px-4 py-1.5 text-sm text-[#ff3b30] border border-[#ff3b30] rounded-lg hover:bg-red-50 transition-colors"
+          @click="handleLogout"
+        >退出登录</button>
+      </header>
+
+      <!-- 内容区 -->
+      <main class="flex-1 min-h-0 overflow-hidden">
         <router-view />
-      </el-main>
-    </el-container>
-  </el-container>
+      </main>
+    </div>
+  </div>
 </template>
-
-<style scoped>
-.layout-root {
-  min-height: 100vh;
-}
-
-.layout-aside {
-  background: #f7faff;
-  border-right: 1px solid #e8eef8;
-  display: flex;
-  flex-direction: column;
-}
-
-.layout-logo {
-  padding: 20px;
-  font-size: 20px;
-  font-weight: 700;
-  color: #3a7ce7;
-}
-
-.chat-nav {
-  padding: 0 12px 12px;
-}
-
-.chat-nav-new {
-  width: 100%;
-  border: 1px solid #d9e7ff;
-  background: linear-gradient(135deg, #5b9dff, #3e82f6);
-  color: #fff;
-  border-radius: 12px;
-  padding: 10px 12px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: transform 0.15s ease;
-}
-
-.chat-nav-new:hover {
-  transform: translateY(-1px);
-}
-
-.chat-nav-scroll {
-  margin-top: 12px;
-  height: calc(100vh - 360px);
-}
-
-.chat-nav-item {
-  background: #ffffff;
-  border: 1px solid #eaf0f6;
-  border-radius: 12px;
-  padding: 10px;
-  margin-bottom: 10px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.chat-nav-item:hover {
-  border-color: #b4cdf8;
-  box-shadow: 0 6px 20px rgba(64, 158, 255, 0.08);
-}
-
-.chat-nav-item.active {
-  background: #edf4ff;
-  border-color: #84b1ff;
-}
-
-.chat-nav-title {
-  font-size: 13px;
-  font-weight: 700;
-  margin-bottom: 6px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.chat-nav-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 4px;
-}
-
-.chat-nav-divider {
-  height: 1px;
-  background: #e8eef8;
-  margin-top: 10px;
-}
-
-.layout-menu {
-  border-right: none;
-  background: transparent;
-}
-
-.layout-header {
-  background: #ffffff;
-  border-bottom: 1px solid #e9eef6;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.layout-user {
-  color: #4e5d74;
-}
-
-.layout-main {
-  padding: 16px;
-}
-</style>
