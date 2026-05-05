@@ -8,21 +8,36 @@ const routes: RouteRecordRaw[] = [
     component: () => import("../views/login/LoginView.vue"),
     meta: { public: true },
   },
+  // 用户端
   {
-    path: "/",
-    component: () => import("../layouts/MainLayout.vue"),
-    meta: { requiresAuth: true },
+    path: "/user",
+    component: () => import("../layouts/UserLayout.vue"),
+    meta: { requiresAuth: true, roles: ["user"] },
     children: [
-      { path: "", redirect: "/chat" },
+      { path: "", redirect: "/user/chat" },
       { path: "chat", component: () => import("../views/chat/ChatView.vue") },
       { path: "mental/analyze", component: () => import("../views/mental/MentalAnalyzeView.vue") },
+      { path: "profile", component: () => import("../views/profile/ProfileView.vue") },
+    ],
+  },
+  // 管理员端
+  {
+    path: "/admin",
+    component: () => import("../layouts/AdminLayout.vue"),
+    meta: { requiresAuth: true, roles: ["admin"] },
+    children: [
+      { path: "", redirect: "/admin/knowledge/manage" },
       {
         path: "knowledge/manage",
         component: () => import("../views/knowledge/KnowledgeManageView.vue"),
-        meta: { roles: ["admin"] },
       },
-      { path: "profile", component: () => import("../views/profile/ProfileView.vue") },
     ],
+  },
+  // 根路径按角色跳转
+  {
+    path: "/",
+    redirect: "/user/chat",
+    meta: { public: true },
   },
   {
     path: "/:pathMatch(.*)*",
@@ -52,9 +67,13 @@ router.beforeEach(async (to) => {
     }
   }
 
-  const roles = to.meta.roles as string[] | undefined;
-  if (roles && authStore.user && !roles.includes(authStore.user.role)) {
-    return "/chat";
+  // 路由声明了允许的角色列表时，检查当前用户角色
+  const allowedRoles = to.meta.roles as string[] | undefined;
+  if (allowedRoles && authStore.user) {
+    if (!allowedRoles.includes(authStore.user.role)) {
+      // 角色不匹配：用户误入管理端 → 回用户首页；管理员误入用户端 → 回管理首页
+      return authStore.user.role === "admin" ? "/admin" : "/user/chat";
+    }
   }
 
   return true;

@@ -6,7 +6,6 @@ import { useChatStore } from "../../stores/chat";
 const question = ref("");
 const chatStore = useChatStore();
 const messagesContainer = ref<HTMLElement | null>(null);
-const inputAreaRef = ref<HTMLElement | null>(null);
 const showCopyButton = ref(false);
 
 const sendMessage = async () => {
@@ -128,15 +127,14 @@ onMounted(async () => {
     </div>
 
     <!-- 底部输入区 -->
-    <div
-      ref="inputAreaRef"
-      class="shrink-0 px-4 pb-4 pt-2"
-      @mouseenter="showCopyButton = true"
-      @mouseleave="showCopyButton = false"
-    >
+    <div class="shrink-0 px-4 pb-4 pt-2">
       <div class="relative max-w-3xl mx-auto">
         <!-- 输入框容器 -->
-        <div class="relative flex items-end gap-2 bg-[#f5f5f7] rounded-2xl border border-transparent focus-within:border-[#d1d1d6] focus-within:bg-white transition-all px-4 py-2.5">
+        <div
+          class="relative flex items-end gap-2 bg-[#f5f5f7] rounded-2xl border border-transparent focus-within:border-[#d1d1d6] focus-within:bg-white transition-all px-4 py-2.5"
+          @mouseenter="showCopyButton = true"
+          @mouseleave="showCopyButton = false"
+        >
           <textarea
             v-model="question"
             :rows="1"
@@ -145,9 +143,8 @@ onMounted(async () => {
             @input="(e: Event) => { const t = e.target as HTMLTextAreaElement; t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 160) + 'px'; }"
             @keydown.enter.exact.prevent="sendMessage"
           />
-          <!-- 悬浮复制图标 - AI 最后一条消息有内容时显示 -->
+          <!-- 悬浮复制图标 - 鼠标悬浮输入区域时显示 -->
           <button
-            v-if="chatStore.messages.length > 0"
             v-show="showCopyButton"
             class="flex items-center justify-center w-8 h-8 rounded-lg text-[#8e8e93] hover:text-[#4f6ef7] hover:bg-[#eef1ff] transition-all shrink-0"
             title="复制最后一条回复"
