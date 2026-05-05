@@ -1,3 +1,4 @@
+import logging
 import sqlite3
 import uuid
 from datetime import datetime, timezone
@@ -6,6 +7,8 @@ from app.core.config import settings
 from app.models.llm import get_chat_model
 from app.services.retrieval import similarity_search
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+
+logger = logging.getLogger(__name__)
 
 
 def _utc_now() -> str:
@@ -311,8 +314,16 @@ def chat_in_conversation(user_id: str, conversation_id: str, question: str) -> t
             HumanMessage(content=question),
         ]
 
-        response = model.invoke(messages)
-        answer = str(response.content)
+        try:
+            response = model.invoke(messages)
+            answer = str(response.content)
+        except Exception:
+            logger.exception("LLM invoke failed for conversation %s", conversation_id)
+            answer = (
+                "非常抱歉，我暂时无法处理您的请求。请稍后再试。"
+                "如果您正处于紧急情况，请立即联系学校心理中心或拨打心理援助热线。"
+            )
+            references = []
 
         _insert_message(conn, conversation_id, "user", question)
         _insert_message(conn, conversation_id, "assistant", answer)
