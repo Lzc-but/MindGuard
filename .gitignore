@@ -23,9 +23,6 @@ env/
 __pycache__/
 *.py[cod]
 
-# 缺失的配置文件
-app/core/config.py
-
 # 分发 / 打包
 dist/
 dist-ssr/

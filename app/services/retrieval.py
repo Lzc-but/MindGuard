@@ -36,15 +36,17 @@ def load_vector_store() -> FAISS | None:
     return _get_index_module().load_index()
 
 
-def similarity_search(query: str, k: int = 4) -> list[str]:
-    """向量相似度检索，返回文本内容列表"""
+def similarity_search(query: str, k: int = 4, score_threshold: float | None = None) -> list[str]:
+    """向量相似度检索，低于阈值的 L2 距离结果被丢弃，返回文本内容列表"""
+    if score_threshold is None:
+        score_threshold = settings.retrieval_score_threshold
     module = _get_index_module()
     if module.vectorstore is None:
         module.load_index()
     if module.vectorstore is None:
         return []
-    docs = module.similarity_search(query, k=k)
-    return [doc.page_content for doc in docs]
+    docs_with_scores = module.vectorstore.similarity_search_with_score(query, k=k)
+    return [doc.page_content for doc, score in docs_with_scores if score <= score_threshold]
 
 
 def _load_chunks() -> List[Document]:
