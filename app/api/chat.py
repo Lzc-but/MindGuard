@@ -1,6 +1,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 
 from app.core.security import get_current_user
 from app.schemas.chat import (
@@ -14,6 +15,7 @@ from app.schemas.chat import (
 )
 from app.services.conversation import (
     chat_in_conversation,
+    chat_in_conversation_stream,
     create_conversation,
     delete_conversation,
     get_conversation_messages,
@@ -92,3 +94,26 @@ async def send_chat_message(
 ) -> ChatResponse:
     answer, refs = chat_in_conversation(current_user["username"], conversation_id, payload.question)
     return ChatResponse(answer=answer, references=refs)
+
+
+@router.post("/conversations/{conversation_id}/messages/stream")
+async def send_chat_message_stream(
+    conversation_id: str,
+    payload: ConversationChatRequest,
+    current_user: Annotated[dict, Depends(get_current_user)],
+):
+    async def _token_generator():
+        async for token in chat_in_conversation_stream(
+            current_user["username"], conversation_id, payload.question
+        ):
+            yield f"data: {token}\n\n"
+
+    return StreamingResponse(
+        _token_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

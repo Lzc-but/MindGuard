@@ -1,4 +1,5 @@
 import http from "./http";
+import { getToken } from "../utils/token";
 
 export interface ChatResponse {
   answer: string;
@@ -40,4 +41,43 @@ export function listConversationMessages(conversationId: string): Promise<Conver
 
 export function sendConversationMessage(conversationId: string, question: string): Promise<ChatResponse> {
   return http.post(`/api/chat/conversations/${conversationId}/messages`, { question });
+}
+
+export async function* sendConversationMessageStream(
+  conversationId: string,
+  question: string,
+): AsyncGenerator<string> {
+  const response = await fetch(`/api/chat/conversations/${conversationId}/messages/stream`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${getToken()}`,
+    },
+    body: JSON.stringify({ question }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("No readable stream");
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      if (line.startsWith("data: ")) {
+        yield line.slice(6);
+      }
+    }
+  }
 }

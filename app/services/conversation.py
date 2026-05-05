@@ -1,10 +1,15 @@
+import logging
 import sqlite3
 import uuid
 from datetime import datetime, timezone
 
 from app.core.config import settings
-from app.graphs.chat_graph import chat_graph
+from app.graphs.chat_graph import chat_graph, CHAT_PROMPT
+from app.models.llm import get_streaming_chat_model
+from app.services.retrieval import similarity_search
 from langchain_core.messages import AIMessage, HumanMessage
+
+logger = logging.getLogger(__name__)
 
 
 def _utc_now() -> str:
@@ -315,5 +320,53 @@ def chat_in_conversation(user_id: str, conversation_id: str, question: str) -> t
         _maybe_update_title(conn, conversation_id, question)
         conn.commit()
         return answer, references
+    finally:
+        conn.close()
+
+
+async def chat_in_conversation_stream(user_id: str, conversation_id: str, question: str):
+    """流式对话：逐个 token 产出，完成后持久化到 SQLite"""
+    conn = _connect()
+    try:
+        _ensure_conversation_exists(conn, user_id, conversation_id)
+
+        references = similarity_search(question, k=3)
+        context = "\n\n".join(references) if references else "No external context found."
+
+        history_messages = _build_history_messages(conn, conversation_id)
+        messages = CHAT_PROMPT.format_messages(
+            context=context,
+            history=history_messages,
+            question=question,
+        )
+
+        model = get_streaming_chat_model()
+        full_answer = ""
+        try:
+            async for chunk in model.astream(messages):
+                token = str(chunk.content) if chunk.content else ""
+                if token:
+                    full_answer += token
+                    yield token
+        except Exception:
+            logger.exception("LLM stream failed for conversation %s", conversation_id)
+            full_answer = (
+                "非常抱歉，我暂时无法处理您的请求。请稍后再试。"
+                "如果您正处于紧急情况，请立即联系学校心理中心或拨打心理援助热线。"
+            )
+            yield full_answer
+
+        _insert_message(conn, conversation_id, "user", question)
+        _insert_message(conn, conversation_id, "assistant", full_answer)
+        conn.execute(
+            """
+            UPDATE conversations
+            SET updated_at = ?
+            WHERE id = ?
+            """,
+            (_utc_now(), conversation_id),
+        )
+        _maybe_update_title(conn, conversation_id, question)
+        conn.commit()
     finally:
         conn.close()

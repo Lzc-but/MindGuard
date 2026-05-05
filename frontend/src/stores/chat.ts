@@ -7,6 +7,7 @@ import {
   listConversations,
   renameConversation,
   sendConversationMessage,
+  sendConversationMessageStream,
   type ChatResponse,
   type ConversationItem,
   type ConversationMessage,
@@ -100,17 +101,17 @@ export const useChatStore = defineStore("chat", {
       }
 
       this.messages.push({ role: "user", content: text });
+      this.messages.push({ role: "assistant", content: "" });
+      const assistantIdx = this.messages.length - 1;
       this.loading = true;
       try {
-        const res: ChatResponse = await sendConversationMessage(this.currentConversationId, text);
-        this.messages.push({
-          role: "assistant",
-          content: res.answer,
-          references: res.references,
-        });
-        return res;
+        const tokens = sendConversationMessageStream(this.currentConversationId, text);
+        for await (const token of tokens) {
+          this.messages[assistantIdx].content += token;
+        }
       } catch {
         ElMessage.error("消息发送失败");
+        this.messages.splice(assistantIdx, 1);
         return null;
       } finally {
         this.loading = false;
