@@ -22,6 +22,11 @@ const isEdit = ref(false);
 const statusTagType = (status: string) => (status === "active" ? "success" : "danger");
 const statusLabel = (status: string) => (status === "active" ? "正常" : "已禁用");
 
+const formatDateTime = (_row: unknown, _column: unknown, cellValue: string) => {
+  if (!cellValue) return "-";
+  return new Date(cellValue).toLocaleString("zh-CN");
+};
+
 // ---- 数据加载 ----
 const fetchUsers = async () => {
   tableLoading.value = true;
@@ -137,7 +142,7 @@ onMounted(fetchUsers);
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="created_at" label="创建时间" min-width="170" />
+        <el-table-column prop="created_at" label="创建时间" min-width="170" :formatter="formatDateTime" />
         <el-table-column label="操作" width="160" fixed="right">
           <template #default="{ row }">
             <el-button size="small" text type="primary" @click="openEdit(row)">编辑</el-button>
