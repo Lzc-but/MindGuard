@@ -22,6 +22,10 @@ http.interceptors.response.use(
     const detail = error?.response?.data?.detail || "请求失败";
 
     if (status === 401) {
+      // 如果当前已在登录页，不拦截（由登录页自行处理错误提示）
+      if (window.location.pathname === "/login") {
+        return Promise.reject(error);
+      }
       clearToken();
       ElMessage.error("登录状态已失效，请重新登录");
       window.location.href = "/login";

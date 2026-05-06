@@ -32,6 +32,13 @@ const submit = async () => {
     ElMessage.success("登录成功");
     const target = authStore.isAdmin ? "/admin" : "/user/chat";
     router.push(target);
+  } catch (e: any) {
+    const detail = e?.response?.data?.detail;
+    if (detail) {
+      ElMessage.error(String(detail));
+    } else {
+      ElMessage.error("登录失败，请检查用户名或密码");
+    }
   } finally {
     loading.value = false;
   }

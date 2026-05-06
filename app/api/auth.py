@@ -26,7 +26,7 @@ async def login(
 
     # 2.如果用户不存在/密码错误，抛出401未授权异常
     if not user:
-        raise HTTPException(status_code=401, detail="Incorrect username or password")
+        raise HTTPException(status_code=401, detail="用户名或者密码错误，请重新输入")
     
     # 3.认证成功->生成JWT访问令牌
     token = create_access_token(
