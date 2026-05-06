@@ -17,3 +17,17 @@ def export_mental_record(record: dict) -> str:
         row = pd.concat([existing, row], ignore_index=True)
     row.to_excel(filename, index=False)
     return str(filename)
+
+
+def export_chat_intent_record(record: dict) -> str:
+    """导出聊天意图记录（CONSULT / RISK）到 Excel"""
+    out_dir = Path(settings.exports_path)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    filename = out_dir / f"chat_records_{datetime.now().strftime('%Y%m%d')}.xlsx"
+
+    row = pd.DataFrame([record])
+    if filename.exists():
+        existing = pd.read_excel(filename)
+        row = pd.concat([existing, row], ignore_index=True)
+    row.to_excel(filename, index=False)
+    return str(filename)

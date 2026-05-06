@@ -5,11 +5,20 @@ from datetime import datetime, timezone
 
 from app.core.config import settings
 from app.graphs.chat_graph import chat_graph, CHAT_PROMPT
-from app.models.llm import get_streaming_chat_model
+from app.models.llm import get_chat_model, get_streaming_chat_model
 from app.services.retrieval import similarity_search
+from app.services.intent import classify_intent
+from app.services.excel import export_chat_intent_record
 from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.prompts import ChatPromptTemplate
 
 logger = logging.getLogger(__name__)
+
+CHAT_MODE_PROMPT = ChatPromptTemplate.from_messages([
+    ("system", "你是一个友好、乐于助人的AI助手，请用自然、亲切的语气回答用户。"),
+    ("placeholder", "{history}"),
+    ("human", "{question}"),
+])
 
 
 def _utc_now() -> str:
@@ -299,13 +308,41 @@ def chat_in_conversation(user_id: str, conversation_id: str, question: str) -> t
     try:
         _ensure_conversation_exists(conn, user_id, conversation_id)
 
+        # 意图分类
+        intent = classify_intent(question)
+        logger.info("Chat intent=%s for conversation=%s", intent, conversation_id)
+
         history_messages = _build_history_messages(conn, conversation_id)
-        result = chat_graph.invoke({
-            "question": question,
-            "history_messages": history_messages,
-        })
-        answer = result["answer"]
-        references = result.get("references", [])
+
+        if intent == "CHAT":
+            # 闲聊模式：不检索知识库，直接 LLM 回答，不记录 Excel
+            messages = CHAT_MODE_PROMPT.format_messages(
+                history=history_messages,
+                question=question,
+            )
+            model = get_chat_model()
+            response = model.invoke(messages)
+            answer = str(response.content)
+            references: list[str] = []
+        else:
+            # CONSULT / RISK：RAG 检索 + LLM + Excel 记录
+            result = chat_graph.invoke({
+                "question": question,
+                "history_messages": history_messages,
+            })
+            answer = result["answer"]
+            references = result.get("references", [])
+
+            try:
+                export_chat_intent_record({
+                    "user_id": user_id,
+                    "intent": intent,
+                    "question": question,
+                    "answer": answer,
+                    "timestamp": _utc_now(),
+                })
+            except Exception:
+                logger.exception("Failed to export chat intent record")
 
         _insert_message(conn, conversation_id, "user", question)
         _insert_message(conn, conversation_id, "assistant", answer)
@@ -330,15 +367,28 @@ async def chat_in_conversation_stream(user_id: str, conversation_id: str, questi
     try:
         _ensure_conversation_exists(conn, user_id, conversation_id)
 
-        references = similarity_search(question, k=3)
-        context = "\n\n".join(references) if references else "No external context found."
+        # 意图分类
+        intent = classify_intent(question)
+        logger.info("Chat intent=%s for conversation=%s (stream)", intent, conversation_id)
 
         history_messages = _build_history_messages(conn, conversation_id)
-        messages = CHAT_PROMPT.format_messages(
-            context=context,
-            history=history_messages,
-            question=question,
-        )
+
+        if intent == "CHAT":
+            # 闲聊模式：不检索知识库，直接 LLM 流式回答
+            references: list[str] = []
+            messages = CHAT_MODE_PROMPT.format_messages(
+                history=history_messages,
+                question=question,
+            )
+        else:
+            # CONSULT / RISK：RAG 检索 + LLM 流式回答
+            references = similarity_search(question, k=3)
+            context = "\n\n".join(references) if references else "No external context found."
+            messages = CHAT_PROMPT.format_messages(
+                context=context,
+                history=history_messages,
+                question=question,
+            )
 
         model = get_streaming_chat_model()
         full_answer = ""
@@ -355,6 +405,19 @@ async def chat_in_conversation_stream(user_id: str, conversation_id: str, questi
                 "如果您正处于紧急情况，请立即联系学校心理中心或拨打心理援助热线。"
             )
             yield full_answer
+
+        # 对 CONSULT / RISK 写入 Excel
+        if intent in ("CONSULT", "RISK"):
+            try:
+                export_chat_intent_record({
+                    "user_id": user_id,
+                    "intent": intent,
+                    "question": question,
+                    "answer": full_answer,
+                    "timestamp": _utc_now(),
+                })
+            except Exception:
+                logger.exception("Failed to export chat intent record (stream)")
 
         _insert_message(conn, conversation_id, "user", question)
         _insert_message(conn, conversation_id, "assistant", full_answer)
