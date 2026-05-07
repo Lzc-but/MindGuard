@@ -20,10 +20,9 @@ async def upload_knowledge(
     # 1.获取文件后缀名
     suffix = Path(file.filename).suffix.lower()
 
-    # 2.只允许上传.txt和.md文件，其他格式直接报错
-    # TODO 后续增加其他格式文件
-    if suffix not in {".txt", ".md"}:
-        raise HTTPException(status_code=400, detail="Only .txt/.md files are supported")
+    # 2.只允许上传.txt、.md和.pdf文件，其他格式直接报错
+    if suffix not in {".txt", ".md", ".pdf"}:
+        raise HTTPException(status_code=400, detail="Only .txt/.md/.pdf files are supported")
     
     # 3.拼接文件保存路径
     out = Path(settings.knowledge_path) / file.filename

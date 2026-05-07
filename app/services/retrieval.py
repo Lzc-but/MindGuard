@@ -7,7 +7,7 @@ from typing import List
 
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import TextLoader
+from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain_community.vectorstores import FAISS
 
 from app.core.config import settings
@@ -52,12 +52,15 @@ def similarity_search(query: str, k: int = 4, score_threshold: float | None = No
 def _load_chunks() -> List[Document]:
     """从知识库目录加载并分块所有文档"""
     knowledge_dir = Path(settings.knowledge_path)
-    files = list(knowledge_dir.glob("*.txt")) + list(knowledge_dir.glob("*.md"))
+    files = list(knowledge_dir.glob("*.txt")) + list(knowledge_dir.glob("*.md")) + list(knowledge_dir.glob("*.pdf"))
     if not files:
         return []
     docs = []
     for fp in files:
-        loader = TextLoader(str(fp), encoding="utf-8")
+        if fp.suffix.lower() == ".pdf":
+            loader = PyPDFLoader(str(fp))
+        else:
+            loader = TextLoader(str(fp), encoding="utf-8")
         docs.extend(loader.load())
     splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=80)
     return splitter.split_documents(docs)

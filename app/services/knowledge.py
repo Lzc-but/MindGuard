@@ -1,6 +1,8 @@
 from pathlib import Path
+from typing import Union
+
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import TextLoader
+from langchain_community.document_loaders import PyPDFLoader, TextLoader
 
 from app.core.config import settings
 from app.services.retrieval import invalidate_cache
@@ -19,13 +21,16 @@ def _create_index_module() -> IndexConstructionModule:
 def build_knowledge_index() -> int:
     """全量重建知识库索引（使用 IndexConstructionModule 分批处理 DashScope 限制）"""
     knowledge_dir = Path(settings.knowledge_path)
-    files = list(knowledge_dir.glob("*.txt")) + list(knowledge_dir.glob("*.md"))
+    files = list(knowledge_dir.glob("*.txt")) + list(knowledge_dir.glob("*.md")) + list(knowledge_dir.glob("*.pdf"))
     if not files:
-        raise ValueError("No text/markdown files found in knowledge directory")
+        return 0
 
     docs = []
     for file_path in files:
-        loader = TextLoader(str(file_path), encoding="utf-8")
+        if file_path.suffix.lower() == ".pdf":
+            loader = PyPDFLoader(str(file_path))
+        else:
+            loader = TextLoader(str(file_path), encoding="utf-8")
         docs.extend(loader.load())
 
     splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=80)
@@ -38,11 +43,12 @@ def build_knowledge_index() -> int:
     return len(chunks)
 
 
-def build_knowledge_by_file(file_path: str) -> int:
+def build_knowledge_by_file(file_path: Union[str, Path]) -> int:
     """增量构建知识库索引（Markdown 结构感知分块 + batch 向量化）"""
+    file_path = Path(file_path)
     if settings.knowledge_path not in str(file_path.parent.resolve()):
         raise ValueError("Invalid file path")
-    data_module = DataPreparationModule(file_path)
+    data_module = DataPreparationModule(str(file_path))
     try:
         data_module.load_documents()
     except Exception as e:

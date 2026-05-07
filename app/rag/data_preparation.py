@@ -10,7 +10,7 @@ from typing import List, Dict, Any
 from langchain_text_splitters import MarkdownHeaderTextSplitter
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
-from langchain_community.document_loaders import TextLoader
+from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from pathlib import Path
 import uuid
 
@@ -42,6 +42,7 @@ class DataPreparationModule:
         
         # 直接读取Markdown文件以保持原始格式
         documents = []
+        errors = []
         path_obj = Path(self.data_path).resolve()
         file_list: List[Path] = []
         if path_obj.is_file():
@@ -50,8 +51,15 @@ class DataPreparationModule:
             file_list.extend(path_obj.rglob())
         for md_file in file_list:
             try:
-                loader = TextLoader(str(md_file), encoding="utf-8")
-                docs = loader.load()[0]
+                file_path_obj = Path(md_file)
+                if file_path_obj.suffix.lower() == ".pdf":
+                    loader = PyPDFLoader(str(md_file))
+                else:
+                    loader = TextLoader(str(md_file), encoding="utf-8")
+                loaded_docs = loader.load()
+                if not loaded_docs:
+                    logger.warning(f"文件 {md_file} 加载后为空，跳过")
+                    continue
 
                 # 为每个父文档分配确定性的唯一ID（基于数据根目录的相对路径）
                 try:
@@ -61,12 +69,18 @@ class DataPreparationModule:
                     relative_path = Path(md_file).as_posix()
                 parent_id = hashlib.md5(relative_path.encode("utf-8")).hexdigest()
 
-                docs.metadata["parent_id"] = parent_id
-                docs.metadata["doc_type"] = "parent"
-                documents.append(docs)
+                # PDF 按页加载，每页为一个独立文档；txt/md 只有一份文档
+                for doc in loaded_docs:
+                    doc.metadata["parent_id"] = parent_id
+                    doc.metadata["doc_type"] = "parent"
+                    documents.append(doc)
 
             except Exception as e:
                 logger.warning(f"读取文件 {md_file} 失败: {e}")
+                errors.append(f"{md_file}: {e}")
+        
+        if not documents and errors:
+            raise RuntimeError(f"所有文件加载失败: {'; '.join(errors)}")
         
         self.documents = documents
         logger.info(f"成功加载 {len(documents)} 个文档")
